@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title></title>
+    <script src="js/angular.js"></script>
+</head>
+<body ng-controller="TestController">
+<h1>{{gameName}}</h1>
+<script>
+    var module = angular.module('App', [])
+            .controller('TestController', function ($scope) {
+                $scope.gameName = '沈世军';
+            });
+    angular.element(document).ready(function () {
+        angular.bootstrap(document, ['App']);
+    });
+
+    var source = {
+        "success": true,
+        "code": 200,
+        "message": "OK",
+        "data": {
+            "id": 475,
+            "image": "/images/media/cover.jpg",
+            "title": "如何修改自己的文章",
+            "created_at": "2013-10-09 13:04:34",
+            "content": "<p><strong>把自己的作品打印出来</strong><br />\n这是一个很痛苦的过程，但是切记，一定要始终做到这一点。这是因为，批评别人的作品比分析你自己的作品要容易得多，因为外在的视角带来了一个新的角度。为了实现这种新的角度，你需要模拟这种“局外人”的视角，用一种与你写它的时候不一样的方式去靠近它。</p>\n<p>因此，在你输入之后，把它打印出来，快速通读，然后拿出一支红笔开始删减。如果你第一稿是手写的，将它键入打印出来，并进行分析。对的，无论何种方式，你都应该去打印。</p>\n<p><strong>休息一下</strong><br />\n如果你的稿件接近截止日期，没有时间进行这一步，那么就直接进行第三步。而如果你有几分钟的空闲，在你和稿件之间创造一段物理距离，也会带来你和稿件间的情感距离。当你休息结束回来用新鲜的眼光去看待同一份稿件，你更有可能发现尴尬的字眼，不必要的措辞，和语法、拼写错误等。因此，出去散个步、上个厕所，或者跟同事聊聊天。如果你能让稿件沉淀一晚上，那最好不过了，因为这样你才能更“无情”地对待你的稿件。</p>\n<p><strong>大声读出来</strong><br />\n最好的作品读起来一定是很通顺流畅，就像在说话一样，只是没那么口语化。所以，把它们大声读出来，才能发现哪些地方听起来别扭。</p>\n<p><strong>假装你就是听众</strong><br />\n下面就该来一些“角色扮演”了。如果你的文章是写给上司看的，就假装自己是上司在读自己的文章，读的时候是觉得“写得不错，应该表扬”？还是“写得不行，还要再改”？如果你写的是留学申请文书，就假装自己是招生官，有没有在读到第二页的时候就觉得无聊了？以目标读者的身份读一读自己的文章，你就知道哪些地方需要修改了。</p>\n<p style=\"text-align: right\">——MyDocumate我的文书伙伴</p>\n",
+            "tags": [
+                {
+                    "id": 20,
+                    "name": "Index Selected"
+                }
+            ],
+            "category": {
+                "id": 3,
+                "name": "Study Abroad"
+            },
+            "user": {
+                "id": 53,
+                "username": "zhuqiandai",
+                "avatar_url": "/uploads/2015/03/29/4ce5fb6346.2014-02-06 20.39.15.60x60.jpg"
+            }
+        }
+    };
+
+    var dest = {};
+
+    angular.copy(source,dest);
+    console.log(dest);
+</script>
+
+</body>
+</html>
