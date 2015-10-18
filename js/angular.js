@@ -1137,6 +1137,8 @@
     function toJsonReplacer(key, value) {
         var val = value;
 
+        //如果是window,document,scope对象,那么返回一个字符.
+        //如果对象的键值开头是$$,那么跳过
         if (typeof key === 'string' && key.charAt(0) === '$' && key.charAt(1) === '$') {
             val = undefined;
         } else if (isWindow(value)) {
@@ -1160,6 +1162,8 @@
      * @description
      * Serializes input into a JSON-formatted string. Properties with leading $$ characters will be
      * stripped since angular uses this notation internally.
+     *
+     * 把对象转换成一个json字符串,只是封装了JSON.stringify而已
      *
      * @param {Object|Array|Date|string|number} obj Input to be serialized into JSON.
      * @param {boolean=} pretty If set to true, the JSON output will contain newlines and whitespace.
