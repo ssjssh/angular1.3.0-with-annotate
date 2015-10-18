@@ -315,6 +315,10 @@
      * Providing 'undefined' or 'null' values for `obj` will not throw a TypeError, but rather just
      * return the value provided.
      *
+     * 给对象和数组提供一个迭代方法,这个方法既可以处理对象,也可以处理函数.迭代器原型是:iterator(value, key, obj)
+     * 这个函数和Array.prototype.forEach不同的是他不会在对象为null或者undefined的时候抛出错误.而是返回原值.
+     * 这是因为Array.prototype.forEach是一个对象方法,虚拟机在接受到一个null的时候只能抛出异常,无法调用任何方法
+     *
      ```js
      var values = {name: 'misko', gender: 'male'};
      var log = [];
@@ -332,6 +336,7 @@
 
     function forEach(obj, iterator, context) {
         var key, length;
+        //为null或者undefined的时候直接返回.
         if (obj) {
             if (isFunction(obj)) {
                 for (key in obj) {
@@ -342,6 +347,7 @@
                     }
                 }
             } else if (isArray(obj) || isArrayLike(obj)) {
+                //可以处理数组或者类数组对象
                 var isPrimitive = typeof obj !== 'object';
                 for (key = 0, length = obj.length; key < length; key++) {
                     if (isPrimitive || key in obj) {
@@ -349,6 +355,7 @@
                     }
                 }
             } else if (obj.forEach && obj.forEach !== forEach) {
+                //如果一个对象中定义了forEach方法,则调用对象上的forEach方法,这给对象自定义提供了便利
                 obj.forEach(iterator, context, obj);
             } else {
                 for (key in obj) {
@@ -426,6 +433,8 @@
      * by passing an empty object as the target: `var object = angular.extend({}, object1, object2)`.
      * Note: Keep in mind that `angular.extend` does not support recursive merge (deep copy).
      *
+     * 把多个源对象中的属性赋值到目标对象中,但是这个过程中只是赋值引用. 没有创建深度拷贝的对象
+     *
      * @param {Object} dst Destination object.
      * @param {...Object} src Source object(s).
      * @returns {Object} Reference to `dst`.
@@ -433,9 +442,11 @@
     function extend(dst) {
         var h = dst.$$hashKey;
 
+        //从第二个参数开始,因为从第二个开始才是源对象
         for (var i = 1, ii = arguments.length; i < ii; i++) {
             var obj = arguments[i];
             if (obj) {
+                //Object.keys只会返回可以迭代的键
                 var keys = Object.keys(obj);
                 for (var j = 0, jj = keys.length; j < jj; j++) {
                     var key = keys[j];
@@ -843,13 +854,13 @@
              * [source,source.data,source.data.tags,source.data.tags[0],source.data.tags[0],source.data.tags
              * source.data.category,source.data.category,source.data.user,source.data.user,source.data,source]
              * 从结果上可以看到stackSource数组的结构和对象嵌套的结构是一致的。
-             * 
+             *
              */
             stackSource = stackSource || [];
             stackDest = stackDest || [];
 
             if (isObject(source)) {
-                /** 
+                /**
                  * 至于stackSource和stackDest有什么用处
                  * 暂时只能猜想是为了应对,对象在属性中引用自身的问题。
                  * 如果出现了对象在属性中引用的情况，那么如果不加indexOf的判断
@@ -863,10 +874,10 @@
                 if (index !== -1) return stackDest[index];
 
                 /**
-                * 每一次一个嵌套对象开始赋值的时候，就把source和destination
-                * 加入数组中，下面copy后面会把这个对象再加入到数组中一次
-                * 这样就好像一个括号的左右两部分把嵌套的对象嵌套起来。
-                **/
+                 * 每一次一个嵌套对象开始赋值的时候，就把source和destination
+                 * 加入数组中，下面copy后面会把这个对象再加入到数组中一次
+                 * 这样就好像一个括号的左右两部分把嵌套的对象嵌套起来。
+                 **/
                 stackSource.push(source);
                 stackDest.push(destination);
             }
@@ -879,8 +890,8 @@
                 for (var i = 0; i < source.length; i++) {
                     result = copy(source[i], null, stackSource, stackDest);
                     /**
-                    * 在copy执行完之后再把source和destination再加入数组一次
-                    **/
+                     * 在copy执行完之后再把source和destination再加入数组一次
+                     **/
                     if (isObject(source[i])) {
                         stackSource.push(source[i]);
                         stackDest.push(result);
@@ -903,8 +914,8 @@
                     if (source.hasOwnProperty(key)) {
                         result = copy(source[key], null, stackSource, stackDest);
                         /**
-                        * 在copy执行完之后再把source和destination再加入数组一次
-                        **/
+                         * 在copy执行完之后再把source和destination再加入数组一次
+                         **/
                         if (isObject(source[key])) {
                             stackSource.push(source[key]);
                             stackDest.push(result);
@@ -970,6 +981,13 @@
      * that begin with `$` are ignored.
      *
      * Scope and DOMWindow objects are being compared only by identify (`===`).
+     * 比较两个对象是否相等.
+     * 1,如果===相等.那对于基本值来说,他们是同值;对于引用类型来说,他们指向同一个对象.
+     * 2,===不成功,但是对象的每一个属性都可以通过angular.equals来比较
+     * 3, NaN == NaN,这是因为在js中 NaN !== NaN
+     * 4, 如果是正则表达式,那么比较他们的模式串.
+     * 5,Scope和DOMWindow对象只通过===比较,也就是说必须是同一个对象.
+     * 注意:在比较过程中,函数和以$开头的属性是忽略的
      *
      * @param {*} o1 Object or value to compare.
      * @param {*} o2 Object or value to compare.
@@ -977,13 +995,26 @@
      */
     function equals(o1, o2) {
         if (o1 === o2) return true;
+        //因为o1!--o2,所以o1和o2不都是null,所以这一步的判断就是如果其中有一个对象为null
+        //那么返回false
         if (o1 === null || o2 === null) return false;
+        /**
+         * 自己和自己都不相等,那么可以断定这是一个NAN,所以返回true.
+         * 但是这样的写法,和底层的实现有关系.即使在标准中定义了也不好.
+         * 应该使用isNaN来判断
+         */
         if (o1 !== o1 && o2 !== o2) return true; // NaN === NaN
         var t1 = typeof o1, t2 = typeof o2, length, key, keySet;
+        //开始的类型判断可以避免两个类型完全不同的对象进入后面的判断,这样的好处是提高性能
         if (t1 == t2) {
+            /**
+             * 基础类型到这里可以直接返回false,
+             * 而函数类型则直接被忽略
+             */
             if (t1 == 'object') {
                 if (isArray(o1)) {
                     if (!isArray(o2)) return false;
+                    //对于数组来说,其中元素的个数和顺序都必须相等.
                     if ((length = o1.length) == o2.length) {
                         for (key = 0; key < length; key++) {
                             if (!equals(o1[key], o2[key])) return false;
@@ -991,9 +1022,11 @@
                         return true;
                     }
                 } else if (isDate(o1)) {
+                    //Date对象比较timestamp
                     if (!isDate(o2)) return false;
                     return equals(o1.getTime(), o2.getTime());
                 } else if (isRegExp(o1) && isRegExp(o2)) {
+                    //正则表达式比较模式串
                     return o1.toString() == o2.toString();
                 } else {
                     if (isScope(o1) || isScope(o2) || isWindow(o1) || isWindow(o2) || isArray(o2)) return false;
@@ -1057,6 +1090,9 @@
      * known as [partial application](http://en.wikipedia.org/wiki/Partial_application), as
      * distinguished from [function currying](http://en.wikipedia.org/wiki/Currying#Contrast_with_partial_function_application).
      *
+     * js中实现偏函数并且绑定对象.所谓的偏函数就是提前把一个函数的一部分参数绑定,并且返回一个只需要剩余参数的函数
+     * 剩余的函数参数可以在调用的时候传入
+     *
      * @param {Object} self Context which `fn` should be evaluated in.
      * @param {function()} fn Function to be bound.
      * @param {...*} args Optional arguments to be prebound to the `fn` function call.
@@ -1064,13 +1100,27 @@
      */
     /* jshint +W101 */
     function bind(self, fn) {
+        //取出要绑定的参数,从第二个开始,因为前两个参数是self和fn.
         var curryArgs = arguments.length > 2 ? sliceArgs(arguments, 2) : [];
         if (isFunction(fn) && !(fn instanceof RegExp)) {
+            /**
+             * 这里两种可能性,一次组合起来有四种可能
+             * 1,curryArgs为空,且arguments为空,那么直接调用fn.call绑定this
+             * 2,curryArgs为空,而arguments不为空,那么调用Function.prototype.apply绑定this,并且把arguments传入.
+             * 3,curryArgs不为空,但是arguments为空,那么调用Function.prototype.apply来绑定
+             * 4,curryArgs不为空,且arguments不为空,那么调用数组的concat连接起来然后调用apply,因为concat只接受数组作为参数
+             *
+             * 把类数组对象转化成数组的方法,一般是使用Array.prototype.slice.call(arrayLike)
+             * slice=[].slice,也就是说slice内部本来的this对象是一个空数组,但是调用call可以改变
+             * 内部绑定的this对象.
+             */
             return curryArgs.length
                 ? function () {
+                //注意:这里的arguments参数是新创建的函数的参数
                 return arguments.length
                     ? fn.apply(self, curryArgs.concat(slice.call(arguments, 0)))
                     : fn.apply(self, curryArgs);
+
             }
                 : function () {
                 return arguments.length
