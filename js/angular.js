@@ -1827,6 +1827,7 @@
      * @description
      *
      * Interface for configuring angular {@link angular.module modules}.
+     *
      */
 
     function setupModuleLoader(window) {
@@ -1838,12 +1839,15 @@
             return obj[name] || (obj[name] = factory());
         }
 
+        //这一步确保window.angular是有对象的,实际上在200几行的时候就创建了angular对象,所以这步基本上不会被执行
         var angular = ensure(window, 'angular', Object);
 
         // We need to expose `angular.$$minErr` to modules such as `ngResource` that reference it during bootstrap
         angular.$$minErr = angular.$$minErr || minErr;
 
+        //在angular上面定义module函数
         return ensure(angular, 'module', function () {
+            //这个对象里面存储了所有的模块
             /** @type {Object.<string, angular.Module>} */
             var modules = {};
 
@@ -1905,11 +1909,15 @@
                     }
                 };
 
+                //模块的名字不能是hasOwnProperty
                 assertNotHasOwnProperty(name, 'module');
+                //如果模块已经存在,那么要先删除掉
                 if (requires && modules.hasOwnProperty(name)) {
                     modules[name] = null;
                 }
                 return ensure(modules, name, function () {
+                    //执行到这一步说明modules[name]=undefined或者null,但是第二个参数有没有指定,因此不是创建模块
+                    //那么也就是说创建模块的参数缺失
                     if (!requires) {
                         throw $injectorMinErr('nomod', "Module '{0}' is not available! You either misspelled " +
                             "the module name or forgot to load it. If registering a module ensure that you " +
@@ -1925,6 +1933,8 @@
                     /** @type {!Array.<Function>} */
                     var runBlocks = [];
 
+                    //config方法注册的函数最后会被$injector.invoke调用,联想到config的方法会接受依赖
+                    //所以$injector.invoke的作用就是找到config注册的函数的依赖,注册之后然后调用
                     var config = invokeLater('$injector', 'invoke', 'push', configBlocks);
 
                     /** @type {angular.Module} */
@@ -1933,6 +1943,13 @@
                         _invokeQueue: invokeQueue,
                         _configBlocks: configBlocks,
                         _runBlocks: runBlocks,
+                        /**这三个数组保存了模块内要执行的动作.从config和run方法的定义来看:
+                        **其中configBlocks保存了config方法注册的函数
+                        **runBlocks保存run方法注册的函数
+                         * 而invokeQueue则存储了其他module方法注册的函数,
+                         * 这三个数组的共同点就是只保存,并不执行.
+                         * 时髦用语是懒执行
+                         * */
 
                         /**
                          * @ngdoc property
@@ -1942,6 +1959,7 @@
                          * @description
                          * Holds the list of modules which the injector will load before the current module is
                          * loaded.
+                         * 保存了模块的依赖模块
                          */
                         requires: requires,
 
@@ -1952,9 +1970,16 @@
                          *
                          * @description
                          * Name of the module.
+                         * 模块名称
                          */
                         name: name,
 
+                        /**
+                         * 从定义上看到,module.provider|factory|service|value|constant只是调用了$provider上同名的工厂方法.
+                         * 而module.animation就是$animateProvider.register
+                         * module.controller=$controllerProvider.register
+                         * module.directive=$compileProvider.directive
+                         */
 
                         /**
                          * @ngdoc method
@@ -2119,6 +2144,9 @@
                     return moduleInstance;
 
                     /**
+                     * invoke返回了一个闭包函数,闭包函数的作用是把provider.method插入到invokeQueue
+                     * 中,也就是说真正的操作并没有执行,而是仅仅把要执行的动作插入,这种模式可以叫做命令模式,
+                     * 这里的作用是在稍后执行这个函数,并不在当时的时候就执行
                      * @param {string} provider
                      * @param {string} method
                      * @param {String=} insertMethod
