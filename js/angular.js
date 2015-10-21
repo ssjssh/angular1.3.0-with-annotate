@@ -30,6 +30,18 @@
      * using minErr('namespace') . Error codes, namespaces and template strings
      * should all be static strings, not variables or general expressions.
      *
+     * 使用方法如下:
+     * var exampleMinErr = minErr('example');
+     * throw exampleMinErr('one', 'This {0} is {1}', foo, bar);
+     *
+     * 其原理是第一步的调用得到一个函数,这个函数是产生一个Error对象的工厂函数,然后在后面可以调用工厂函数来产生异常对象
+     * 产生的异常对象会包含一个链接,类似于https://docs.angularjs.org/error/$http/badreq,因此$http就是module参数的值
+     * 而code(工厂函数的第一个值)是badreq,这样的方式可以在运行出错的时候提供一个到angular官网的链接
+     *
+     * 例如:在setupModuleLoader的时候就有这样的用法,也就是说https://docs.angularjs.org/error/ng/badname是一个描述错误的页面
+     * var ngMinErr = minErr('ng');
+     * throw ngMinErr('badname', 'hasOwnProperty is not a valid {0} name', context);
+     *
      * @param {string} module The namespace to use for the new minErr instance.
      * @param {function} ErrorConstructor Custom error constructor to be instantiated when returning
      *   error from returned function, for cases when a particular type of error is useful.
@@ -37,14 +49,18 @@
      */
 
     function minErr(module, ErrorConstructor) {
+        //可以自定义异常类型
         ErrorConstructor = ErrorConstructor || Error;
+        //匿名函数就是工厂函数
         return function () {
             var code = arguments[0],
                 prefix = '[' + (module ? module + ':' : '') + code + '] ',
                 template = arguments[1],
                 templateArgs = arguments,
+            //一个实现对象toString的简单函数
                 stringify = function (obj) {
                     if (typeof obj === 'function') {
+                        //replace把函数字符串的前后大括号及内部的内容都删除掉,也就是说只留下函数原型
                         return obj.toString().replace(/ \{[\s\S]*$/, '');
                     } else if (typeof obj === 'undefined') {
                         return 'undefined';
@@ -55,10 +71,13 @@
                 },
                 message, i;
 
+            //这个就是把模板中的占位符替换成真正的值的过程,正则表达式是{\d+},即{}和中间的数字
             message = prefix + template.replace(/\{\d+\}/g, function (match) {
+                    //match是{0},这一步把得到一个数字,而前面的加号是把字符串转换成数字
                     var index = +match.slice(1, -1), arg;
 
                     if (index + 2 < templateArgs.length) {
+                        //从传递进来的参数的第三个开始算,因为前面的两个分别是code和template
                         arg = templateArgs[index + 2];
                         if (typeof arg === 'function') {
                             return arg.toString().replace(/ ?\{[\s\S]*$/, '');
@@ -75,9 +94,11 @@
             message = message + '\nhttp://errors.angularjs.org/1.3.1/' +
                 (module ? module + '/' : '') + code;
             for (i = 2; i < arguments.length; i++) {
+                //在链接后面加上模板中的参数:p0,p1....,这样可以在错误页面直接显示错误信息
                 message = message + (i == 2 ? '?' : '&') + 'p' + (i - 2) + '=' +
                     encodeURIComponent(stringify(arguments[i]));
             }
+            //最终的一步创建Error对象
             return new ErrorConstructor(message);
         };
     }
@@ -1641,6 +1662,7 @@
         });
     }
 
+    //用一个变量记录是否已经指定过bindJQuery函数
     var bindJQueryFired = false;
     var skipDestroyOnNextJQueryCleanData;
 
@@ -1686,9 +1708,11 @@
                 originalCleanData(elems);
             };
         } else {
+            //默认是JQLite
             jqLite = JQLite;
         }
 
+        //因此angular.element可以像一个JQuery那样用
         angular.element = jqLite;
 
         // Prevent double-proxying.
@@ -2272,6 +2296,7 @@
             'reloadWithDebugInfo': reloadWithDebugInfo
         });
 
+        //angularModule
         angularModule = setupModuleLoader(window);
         try {
             angularModule('ngLocale');
