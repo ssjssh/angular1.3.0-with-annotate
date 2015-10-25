@@ -1386,104 +1386,11 @@
      * should contain the application code needed or have dependencies on other modules that will
      * contain the code. See {@link angular.module} for more information.
      *
-     * In the example below if the `ngApp` directive were not placed on the `html` element then the
-     * document would not be compiled, the `AppController` would not be instantiated and the `{{ a+b }}`
-     * would not be resolved to `3`.
-     *
-     * `ngApp` is the easiest, and most common, way to bootstrap an application.
-     *
-     <example module="ngAppDemo">
-     <file name="index.html">
-     <div ng-controller="ngAppDemoController">
-     I can add: {{a}} + {{b}} =  {{ a+b }}
-     </div>
-     </file>
-     <file name="script.js">
-     angular.module('ngAppDemo', []).controller('ngAppDemoController', function($scope) {
-     $scope.a = 1;
-     $scope.b = 2;
-   });
-     </file>
-     </example>
-     *
-     * Using `ngStrictDi`, you would see something like this:
-     *
-     <example ng-app-included="true">
-     <file name="index.html">
-     <div ng-app="ngAppStrictDemo" ng-strict-di>
-     <div ng-controller="GoodController1">
-     I can add: {{a}} + {{b}} =  {{ a+b }}
-
-     <p>This renders because the controller does not fail to
-     instantiate, by using explicit annotation style (see
-     script.js for details)
-     </p>
-     </div>
-
-     <div ng-controller="GoodController2">
-     Name: <input ng-model="name"><br />
-     Hello, {{name}}!
-
-     <p>This renders because the controller does not fail to
-     instantiate, by using explicit annotation style
-     (see script.js for details)
-     </p>
-     </div>
-
-     <div ng-controller="BadController">
-     I can add: {{a}} + {{b}} =  {{ a+b }}
-
-     <p>The controller could not be instantiated, due to relying
-     on automatic function annotations (which are disabled in
-     strict mode). As such, the content of this section is not
-     interpolated, and there should be an error in your web console.
-     </p>
-     </div>
-     </div>
-     </file>
-     <file name="script.js">
-     angular.module('ngAppStrictDemo', [])
-     // BadController will fail to instantiate, due to relying on automatic function annotation,
-     // rather than an explicit annotation
-     .controller('BadController', function($scope) {
-       $scope.a = 1;
-       $scope.b = 2;
-     })
-     // Unlike BadController, GoodController1 and GoodController2 will not fail to be instantiated,
-     // due to using explicit annotations using the array style and $inject property, respectively.
-     .controller('GoodController1', ['$scope', function($scope) {
-       $scope.a = 1;
-       $scope.b = 2;
-     }])
-     .controller('GoodController2', GoodController2);
-     function GoodController2($scope) {
-       $scope.name = "World";
-     }
-     GoodController2.$inject = ['$scope'];
-     </file>
-     <file name="style.css">
-     div[ng-controller] {
-       margin-bottom: 1em;
-       -webkit-border-radius: 4px;
-       border-radius: 4px;
-       border: 1px solid;
-       padding: .5em;
-   }
-     div[ng-controller^=Good] {
-       border-color: #d6e9c6;
-       background-color: #dff0d8;
-       color: #3c763d;
-   }
-     div[ng-controller^=Bad] {
-       border-color: #ebccd1;
-       background-color: #f2dede;
-       color: #a94442;
-       margin-bottom: 0;
-   }
-     </file>
-     </example>
+     * angularInit用来在页面加载完成之后启动应用
+     * angular只会自动找到的第一个ngApp,后面的引用都需要调用angular.bootstrap启动
      */
     function angularInit(element, bootstrap) {
+        //appElement存储定义根app的Element元素,module存储了根模块的名字
         var appElement,
             module,
             config = {};
@@ -1492,11 +1399,13 @@
         forEach(ngAttrPrefixes, function (prefix) {
             var name = prefix + 'app';
 
+            //appElement只能版定一个,因此这里需要首先判断appElement是否已经绑定
             if (!appElement && element.hasAttribute && element.hasAttribute(name)) {
                 appElement = element;
                 module = element.getAttribute(name);
             }
         });
+        //从实现上来讲,forEach因为不能在中间退出,因此不得不在所有前缀上都测试一遍,所以应该给forEach加上守卫条件
         forEach(ngAttrPrefixes, function (prefix) {
             var name = prefix + 'app';
             var candidate;
@@ -1548,6 +1457,7 @@
      * </body>
      * </html>
      * ```
+     * angular.bootstrap函数用来手动启动一个应用
      *
      * @param {DOMElement} element DOM element which is the root of angular application.
      * @param {Array<String|Function|Array>=} modules an array of modules to load into the application.
@@ -1567,10 +1477,12 @@
         var defaultConfig = {
             strictDi: false
         };
+        //合并,后面对象的内容会替代前面对象的内容
         config = extend(defaultConfig, config);
         var doBootstrap = function () {
             element = jqLite(element);
 
+            //多次执行bootstrap会引发错误,也就是多次启动.而另一个地方是多次加载angular会引发异常
             if (element.injector()) {
                 var tag = (element[0] === document) ? 'document' : startingTag(element);
                 //Encode angle brackets to prevent input from being sanitized to empty string #8683
@@ -1581,6 +1493,7 @@
             }
 
             modules = modules || [];
+            //在modules前面加入了一个函数
             modules.unshift(['$provide', function ($provide) {
                 $provide.value('$rootElement', element);
             }]);
@@ -1845,7 +1758,7 @@
         // We need to expose `angular.$$minErr` to modules such as `ngResource` that reference it during bootstrap
         angular.$$minErr = angular.$$minErr || minErr;
 
-        //在angular上面定义module函数
+        //在angular上面定义module函数,因此angular.module=setupModuleLoader(window)
         return ensure(angular, 'module', function () {
             //这个对象里面存储了所有的模块
             /** @type {Object.<string, angular.Module>} */
@@ -1944,8 +1857,8 @@
                         _configBlocks: configBlocks,
                         _runBlocks: runBlocks,
                         /**这三个数组保存了模块内要执行的动作.从config和run方法的定义来看:
-                        **其中configBlocks保存了config方法注册的函数
-                        **runBlocks保存run方法注册的函数
+                         **其中configBlocks保存了config方法注册的函数
+                         **runBlocks保存run方法注册的函数
                          * 而invokeQueue则存储了其他module方法注册的函数,
                          * 这三个数组的共同点就是只保存,并不执行.
                          * 时髦用语是懒执行
@@ -2324,20 +2237,24 @@
             'reloadWithDebugInfo': reloadWithDebugInfo
         });
 
-        //angularModule
+        //angularModule就是angular..module
         angularModule = setupModuleLoader(window);
         try {
+            //这里如果ngLocale不存在是会抛出异常的,因此在下面的地方创建ngLocale
+            //而在一般的应用中是不需要接受异常的,直接让它报错就好了
             angularModule('ngLocale');
         } catch (e) {
             angularModule('ngLocale', []).provider('$locale', $LocaleProvider);
         }
 
+        //ngLocal->ng->用户自定义模块,因此绑定在ng上面的指令和服务都可以被自定义模块使用
         angularModule('ng', ['ngLocale'], ['$provide',
             function ngModule($provide) {
                 // $$sanitizeUriProvider needs to be before $compileProvider as it is used by it.
                 $provide.provider({
                     $$sanitizeUri: $$SanitizeUriProvider
                 });
+                //$provider.provider注册一个服务并且返回服务对象,因此相当于调用$compile.directive
                 $provide.provider('$compile', $CompileProvider).
                     directive({
                         a: htmlAnchorDirective,
@@ -25916,7 +25833,10 @@
     bindJQuery();
 
 
-    //在angular对象上面绑定公开的API,有一些是工具函数
+    /**
+     * 在angular对象上面绑定公开的API,有一些是工具函数
+     * 同时定义好了ng和ngLocal模块,以及内置的指令和服务
+     */
     publishExternalAPI(angular);
 
     //启动angular的init过程
