@@ -6,12 +6,15 @@
     <script src="js/angular.js"></script>
 </head>
 <body ng-controller="TestController">
-<h1>{{gameName}}</h1>
+<h1>{{name}}</h1>
 <script>
-    var module = angular.module('App', [])
-            .controller('TestController', function ($scope) {
-                $scope.gameName = '沈世军';
-            });
+    var module = angular.module('App', []);
+    module.value('gameName', '沈世军');
+    module.controller('TestController', ['$scope', '$injector', function ($scope, $injector) {
+        $injector.invoke(function (gameName) {
+            $scope.name = gameName;
+        });
+    }]);
 </script>
 
 </body>

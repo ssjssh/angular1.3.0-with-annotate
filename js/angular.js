@@ -1506,7 +1506,14 @@
             }
 
             modules.unshift('ng');
+            //创建系统中的$injector,然后调用$compile来开始编译html
             var injector = createInjector(modules, config.strictDi);
+            /**
+             * 在publishExternalAPI中会使用$provider中定义系统内置的服务,但是$provider则需要$injector来注入,而$injector是在bootsrap中被创建的
+             * 这里有一个鸡生蛋和蛋生鸡的问题必须要解释下,这是因为在publishExternalAPI中调用$provider的地方是是在config中,而config则中其实仅仅是把函数
+             * 定义存储到了三个数组中(看setupModuleLoader可以得知),而在createInjector中则会在$injector创建之后立马调用module中数组存储的方法.也就是说
+             * $provider在createInjector才会被正真调用.
+             */
             injector.invoke(['$rootScope', '$rootElement', '$compile', '$injector',
                     function bootstrapApply(scope, element, compile, injector) {
                         scope.$apply(function () {
@@ -1521,8 +1528,11 @@
         var NG_ENABLE_DEBUG_INFO = /^NG_ENABLE_DEBUG_INFO!/;
         var NG_DEFER_BOOTSTRAP = /^NG_DEFER_BOOTSTRAP!/;
 
+        //在bootstrap中会用正则表达式匹配NG_ENABLE_DEBUG_INFO,而在reloadWithDebugInfo正好在window.name前面加上了NG_ENABLE_DEBUG_INFO
+        //因此angular.reloadWithDebugInfo的作用就是加载调试信息然后重新加载页面
         if (window && NG_ENABLE_DEBUG_INFO.test(window.name)) {
             config.debugInfoEnabled = true;
+            //把启动调试标志删除了
             window.name = window.name.replace(NG_ENABLE_DEBUG_INFO, '');
         }
 
