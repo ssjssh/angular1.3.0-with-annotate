@@ -9,10 +9,10 @@
 <h1>{{name}}</h1>
 <script>
     var module = angular.module('App', []);
-    module.value('gameName', '沈世军');
+    module.value({'gameName': '沈世军', 'gameName2': "沈世军2"});
     module.controller('TestController', ['$scope', '$injector', function ($scope, $injector) {
-        $injector.invoke(function (gameName) {
-            $scope.name = gameName;
+        $injector.invoke(function (gameName, gameName2) {
+            $scope.name = gameName + ' ' + gameName2;
         });
     }]);
 </script>

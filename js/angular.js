@@ -1482,7 +1482,7 @@
         var doBootstrap = function () {
             element = jqLite(element);
 
-            //多次执行bootstrap会引发错误,也就是多次启动.而另一个地方是多次加载angular会引发异常
+            //多次执行bootstrap会引发错误,也就是多次启动.而另一个地方是多次加载angular会引发warning
             if (element.injector()) {
                 var tag = (element[0] === document) ? 'document' : startingTag(element);
                 //Encode angle brackets to prevent input from being sanitized to empty string #8683
@@ -1505,6 +1505,7 @@
                 }]);
             }
 
+            //加载ng模块,因为所有的模块都依赖于ng模块,所以ng模块会被加载
             modules.unshift('ng');
             //创建系统中的$injector,然后调用$compile来开始编译html
             var injector = createInjector(modules, config.strictDi);
@@ -3373,6 +3374,8 @@
      *  object is either result of calling $$hashKey function on the object or uniquely generated id,
      *         that is also assigned to the $$hashKey property of the object.
      *
+     *  计算一个对象的hash值,但是这个函数计算出的的值并不是数字,而是一个字符串
+     *
      * @param obj
      * @returns {string} hash string such that the same input will have the same hash string.
      *         The resulting string key is in 'type:hashKey' format.
@@ -3380,6 +3383,7 @@
     function hashKey(obj, nextUidFn) {
         var key = obj && obj.$$hashKey;
 
+        //如果对象中存储了$$hashKey或者$$hashKey是一个函数,那么直接返回
         if (key) {
             if (typeof key === 'function') {
                 key = obj.$$hashKey();
@@ -3387,6 +3391,15 @@
             return key;
         }
 
+        /**
+         * 如果参数是一个函数或者对象,那么计算他们的hash值并且存储在obj.$$hashKey中,而hash值是: 对象类型:{unionId}
+         * 如果是一个基础类型,那么hash值是 对象类型:toString结果
+         *
+         * 注意:对于同一个对象,或者说对象的每一个属性都相等的时候那么他们的hash值应该是一样的,
+         * 但是在这里面是不满足的(想象下,如果如果两个相同的对象,那么通过这个函数算出的hash值是不同的)
+         * 因此把hash值写入对象是必要的,这样这个对象可以被共享,那么下次如果传递同样的引用可以计算同样的值
+         * @type {string}
+         */
         var objType = typeof obj;
         if (objType == 'function' || (objType == 'object' && obj !== null)) {
             key = obj.$$hashKey = objType + ':' + (nextUidFn || nextUid)();
@@ -3399,6 +3412,8 @@
 
     /**
      * HashMap which can use objects as keys
+     * js中的对象键只能是字符串,而HashMap则支持对象作为键,其实就是算出了对象的hash值作为键
+     * isolatedUid表示这个HashMap中的对象不使用全局统一的计数来作为hash值,而是对于本HashMap来说唯一的ID
      */
     function HashMap(array, isolatedUid) {
         if (isolatedUid) {
@@ -4080,6 +4095,18 @@
         // $provider
         ////////////////////////////////////
 
+        /**
+         * supportObject支持两种传参数的方法,key=>value或者key是一个对象
+         * 如果key=>value是一个简单值,那么调用delegate(key, value)
+         * 如果key是一个对象,那么调用forEach(key,delegate(key, value))
+         *
+         * 例如:
+         * module.value({'gameName': '沈世军', 'gameName2': "沈世军2"});
+         * 和
+         * module.value('gameName', '沈世军');
+         * @param delegate
+         * @returns {Function}
+         */
         function supportObject(delegate) {
             return function (key, value) {
                 if (isObject(key)) {
@@ -4091,6 +4118,7 @@
         }
 
         function provider(name, provider_) {
+            //定义的provider都是存储到一个对象中的,因此provider的名字不能是hasOwnproperty
             assertNotHasOwnProperty(name, 'service');
             if (isFunction(provider_) || isArray(provider_)) {
                 provider_ = providerInjector.instantiate(provider_);
