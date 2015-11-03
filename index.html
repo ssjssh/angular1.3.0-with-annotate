@@ -10,11 +10,9 @@
 <script>
     var module = angular.module('App', []);
     module.value({'gameName': '沈世军', 'gameName2': "沈世军2"});
-    module.controller('TestController', ['$scope', '$injector', function ($scope, $injector) {
-        $injector.invoke(function (gameName, gameName2) {
-            $scope.name = gameName + ' ' + gameName2;
-        });
-    }]);
+    module.controller('TestController', ['$scope', '$injector', 'test', function ($scope, $injector, test) {
+        $scope.name = test;
+    }]).constant('test', 'first').constant('test', 'abc').constant('test', 123);
 </script>
 
 </body>
