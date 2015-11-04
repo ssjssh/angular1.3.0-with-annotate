@@ -3472,7 +3472,7 @@
         var INSTANTIATING = {},
             providerSuffix = 'Provider',
             /**
-             * path存储了依赖的逻辑？
+             * path存储了依赖解析的顺序，类似于函数的调用栈，最新的肯定在最上面，只有一个依赖查询完成之后才会调用被清空，一旦发生异常，那么path是不会被清空的。
              */
             path = [],
             /**
@@ -3692,6 +3692,17 @@
 
             function getService(serviceName) {
                 if (cache.hasOwnProperty(serviceName)) {
+                    /**
+                     * 检查循环以来的逻辑：因为所有的依赖查找都是从instanceInjector开始的，因此假设是需要查找依赖A。
+                     * 1，如果A可以从instanceCache中查询到（当然不能是INSTANTIATING，因为INSTANTIATING只是一个空的标志），那么肯定不会检测出循环依赖（因为get立马返回找到的对象）
+                     * 2，因此检测到循环依赖的情况只能是在A依赖不能从instanceCache中查询到，那么会调用instanceInjector的factory，进而调用providerInjector.get和instanceInjector.invoke
+                     * 3，这里就有两个分支了，如果providerInjector.get没有找到依赖，那么需要调用ProviderInjector的factory方法，也就是抛出异常，这就是下面的catch接受到的异常。这种情况是找不到依赖
+                     * 4，如果通过providerInjector.get找到了依赖，那么就要到用instanceInjector.invoke(providerObj.$get)来生产一个实例，但是一个provider.$get也有可能有依赖，也就是说会继续调用instanceInjector.getService
+                     * 注意：鉴于ProviderInjector和instanceInjector会循环调用，因为上面的几个步骤可能会任意多。
+                     *
+                     * 这个时候如果任何一步再依赖到A（因为A找不到，因此instanceCache[A]===INSTANTIATING），所以就会进入这一步，进而判断出循环依赖。而且一旦有循环依赖，那么肯定能检查出来。
+                     * 那么为什么一定要在查找依赖的时候把cache[serviceName]设置为INSTANTIATING？因为这是一个查找但是没有找到的标志，如果不设置，那么就算有循环依赖，再次查询到A的时候也只能继续调用factory方法依赖，也就是循环依赖会导致死循环
+                     */
                     if (cache[serviceName] === INSTANTIATING) {
                         throw $injectorMinErr('cdep', 'Circular dependency found: {0}',
                             serviceName + ' <- ' + path.join(' <- '));
@@ -3703,6 +3714,11 @@
                         cache[serviceName] = INSTANTIATING;
                         return cache[serviceName] = factory(serviceName);
                     } catch (err) {
+                        /**
+                         * instanceInject的factory方法就是调用ProviderInstance来初始化对象
+                         * providerInjector.get方法会在serviceName不存在时抛出异常，因此如果instanceInject.get执行到这边
+                         * 那么说明ProviderInjector中没有这个service，所以把cache[serviceName]清除，避免误判断为循环依赖
+                         */
                         if (cache[serviceName] === INSTANTIATING) {
                             delete cache[serviceName];
                         }
