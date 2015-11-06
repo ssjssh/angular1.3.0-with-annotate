@@ -10,9 +10,11 @@
 <script>
     var module = angular.module('App', []);
     module.value({'gameName': '沈世军', 'gameName2': "沈世军2"});
-    module.controller('TestController', ['$scope', '$injector', 'test', function ($scope, $injector, test) {
-        $scope.name = test;
-    }]).constant('test', 'first').constant('test', 'abc').constant('test', 123);
+    module.controller('TestController', ['$injector', function ($injector) {
+        var result = $injector.annotate(['$injector', '$q', function ($injector, $q) {
+        }]);
+        console.log($q);
+    }]);
 </script>
 
 </body>

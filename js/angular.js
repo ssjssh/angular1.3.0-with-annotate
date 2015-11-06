@@ -3420,6 +3420,13 @@
         return 'fn';
     }
 
+    /**
+     * 分析一个函数的依赖，在strictDi的时候如果fn是一个函数对象，那么会直接抛出异常。
+     * @param fn
+     * @param strictDi
+     * @param name
+     * @returns {*}
+     */
     function annotate(fn, strictDi, name) {
         var $inject,
             fnText,
@@ -3427,6 +3434,11 @@
             last;
 
         if (typeof fn === 'function') {
+            /**
+             * 如果传递一个函数对象，会先读取fn.$inject，这个属性存储了函数对象的依赖列表
+             * 其实就是一种缓存
+             */
+
             if (!($inject = fn.$inject)) {
                 $inject = [];
                 if (fn.length) {
@@ -3448,6 +3460,7 @@
                 fn.$inject = $inject;
             }
         } else if (isArray(fn)) {
+            //如果传入的就是一个数组，那么说明这个函数是内联注入，这样的只需要把最后的函数除去就可以了。
             last = fn.length - 1;
             assertArgFn(fn[last], 'fn');
             $inject = fn.slice(0, last);
@@ -3729,6 +3742,14 @@
                 }
             }
 
+            /**
+             *
+             * @param fn
+             * @param self
+             * @param locals
+             * @param serviceName
+             * @returns {*}
+             */
             function invoke(fn, self, locals, serviceName) {
                 if (typeof locals === 'string') {
                     serviceName = locals;
