@@ -1,23 +1,12 @@
-var FN_ARGS = /^function\s*[^\(]*\(\s*([^\)]*)\)/m;
-var STRIP_COMMENTS = /((\/\/.*$)|(\/\*[\s\S]*?\*\/))/mg;
-
-function anonFn(fn) {
-    // For anonymous functions, showing at the very least the function signature can help in
-    // debugging.
-    var fnText = fn.toString().replace(STRIP_COMMENTS, ''),
-        args = fnText.match(FN_ARGS);
-    if (args) {
-        return 'function(' + (args[1] || '').replace(/[\s\r\n]+/, ' ') + ')';
-    }
-    return 'fn';
+function Contact(name, email) {
+    this.name = name;
+    this.email = email;
 }
 
-console.log(anonFn(function (a, b) {
-    return a + b;
-}));
-
-function test(a, b) {
-    return a + b;
-}
-
-console.log(anonFn(test));
+Contact.prototype.dump = function () {
+    console.log(this.name + ", " + this.email);
+};
+var o = {};
+var obj = Contact.apply(o, ["ssj", '163.com']);
+console.log(obj);
+console.log(o);

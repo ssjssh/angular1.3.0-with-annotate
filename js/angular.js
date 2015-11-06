@@ -3636,6 +3636,7 @@
 
             origProvider.$get = function () {
                 var origInstance = instanceInjector.invoke(orig$get, origProvider);
+                //被装饰的Service对象会通过$delegate注入依赖，注意这儿注入的不是原本来的Provider
                 return instanceInjector.invoke(decorFn, null, {$delegate: origInstance});
             };
         }
@@ -3699,7 +3700,6 @@
          * 创建真正的injector对象
          * @param cache 用来存储创建的单例对象
          * @param factory
-         * @returns {{invoke: invoke, instantiate: instantiate, get: getService, annotate: annotate, has: Function}}
          */
         function createInternalInjector(cache, factory) {
 
@@ -3743,14 +3743,16 @@
             }
 
             /**
-             *
+             * invoke函数的工作原理就是首先解析函数原型，找到函数参数，其次从local中或者本Injector包含的依赖中取出依赖
+             * 最后调用Function.apply(self)来执行函数，并且返回函数值。
              * @param fn
-             * @param self
-             * @param locals
+             * @param self 函数调用的时候绑定的this对象
+             * @param locals 可以在invoke的时候提供一些自己指定的参数，也就是不是所有的依赖都会通过$injector.get来获取
              * @param serviceName
              * @returns {*}
              */
             function invoke(fn, self, locals, serviceName) {
+                //locals这个参数可以用来传递serviceName参数
                 if (typeof locals === 'string') {
                     serviceName = locals;
                     locals = null;
@@ -3767,21 +3769,32 @@
                         throw $injectorMinErr('itkn',
                             'Incorrect injection token! Expected service name as string, got {0}', key);
                     }
+                    /**
+                     * 优先从指定的参数中取
+                     */
                     args.push(
                         locals && locals.hasOwnProperty(key)
                             ? locals[key]
                             : getService(key)
                     );
                 }
+                //参数有可能是一个数组（内联注入），这种情况下最会一个是真正的参数
                 if (isArray(fn)) {
                     fn = fn[length];
                 }
 
                 // http://jsperf.com/angularjs-invoke-apply-vs-switch
-                // #5388
+                // 调用函数
                 return fn.apply(self, args);
             }
 
+            /**
+             * 调用Type函数，并且给构造函数注入依赖，主要目的还是要创建一个对象。
+             * @param Type
+             * @param locals
+             * @param serviceName
+             * @returns {*}
+             */
             function instantiate(Type, locals, serviceName) {
                 var Constructor = function () {
                     },
@@ -3790,6 +3803,12 @@
                 // Check if Type is annotated and use just the given function at n-1 as parameter
                 // e.g. someModule.factory('greeter', ['$window', function(renamed$window) {}]);
                 Constructor.prototype = (isArray(Type) ? Type[Type.length - 1] : Type).prototype;
+                /**
+                 * 必须要创建一个空的对象，有两个原因：
+                 * 1，在apply的时候必须要传递一个this对象
+                 * 2，一个构造函数可能在大部分的时候都不会返回this，这样的话必须把instance返回作为新创建的对象
+                 * 创建空对象的过程可以使用Object.create代替，但是Object.create在es5才有，所以为了兼容性不用它
+                 */
                 instance = new Constructor();
                 returnedValue = invoke(Type, instance, locals, serviceName);
 
