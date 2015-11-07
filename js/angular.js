@@ -3526,6 +3526,7 @@
 
 
         forEach(loadModules(modulesToLoad), function (fn) {
+            //执行modules.__runBlocks中的内容
             instanceInjector.invoke(fn || noop);
         });
 
@@ -3641,12 +3642,30 @@
             };
         }
 
-        ////////////////////////////////////
-        // Module Loading
-        ////////////////////////////////////
+        /**
+         * 启动模块并且调用模块的配置函数,最后返回models.runBlocks,也就是module.run方法注册的函数
+         *
+         * 这个函数涉及了四种类型的函数。
+         * 1，module.run注册的函数，存储在module._runBlocks中，这种函数没有在本函数中被调用而是被顺序存储在一个数据中被返回，最后是被instanceInjector.invoke调用
+         * 2，module.config注册的函数，存储在module._configBlock中，在本函数被providerInjector.invoke调用，正如config这个名字所指的，通过module.config注册的函数
+         * 可以依赖于系统中定义的Provider，而正好ProviderInjector可以注入Provider（未实例的Service），而在config注册的函数也因此调用Provider上面的一些函数来改变Provider的配置。
+         * 3，在module上定义的各种工具函数，例如：module.service,module.filter这些工厂函数无一例外都依赖于Provider，注册函数存储在module._invokeQueue，所以也被ProviderInjector.invoke调用
+         * 4，modulesToLoad数组中本身也可以传递初始化函数，也会被ProviderInjector.invoke调用
+         *
+         *
+         * 一般情况下，参数会是
+         * [ng,
+         * $provide,function ($provide) {
+                $provide.value('$rootElement', element);
+            },
+         App]
+         * @param modulesToLoad
+         * @returns {Array}
+         */
         function loadModules(modulesToLoad) {
             var runBlocks = [], moduleFn;
             forEach(modulesToLoad, function (module) {
+                //避免重新加载，因为module可能是一个数组或者函数，这也是loadedModules使用HashMap的原因
                 if (loadedModules.get(module)) return;
                 loadedModules.put(module, true);
 
@@ -3662,11 +3681,15 @@
 
                 try {
                     if (isString(module)) {
+                        //得到模块对象
                         moduleFn = angularModule(module);
+                        //首先加载了本模块依赖的模块，然后runBlocks连接在一起
                         runBlocks = runBlocks.concat(loadModules(moduleFn.requires)).concat(moduleFn._runBlocks);
+                        //调用config注册的函数和工厂函数注册的函数
                         runInvokeQueue(moduleFn._invokeQueue);
                         runInvokeQueue(moduleFn._configBlocks);
                     } else if (isFunction(module)) {
+                        //如果modulesToLoad本来就有初始化函数，那么调用，因为providerInjector.invoke(module)的返回值可能是undefined，因为可以看到在执行runBlocks的时候判断了undefined的情况
                         runBlocks.push(providerInjector.invoke(module));
                     } else if (isArray(module)) {
                         runBlocks.push(providerInjector.invoke(module));
