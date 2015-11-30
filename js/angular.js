@@ -5909,6 +5909,7 @@
      */
     $CompileProvider.$inject = ['$provide', '$$sanitizeUriProvider'];
     function $CompileProvider($provide, $$sanitizeUriProvider) {
+        //存储了系统中定义的指令的匿名函数,这里并没有记录指令的详细配置，正如其名字所示的一样。
         var hasDirectives = {},
             Suffix = 'Directive',
             COMMENT_DIRECTIVE_REGEXP = /^\s*directive\:\s*([\w\-]+)\s+(.*)$/,
@@ -6437,6 +6438,8 @@
                  * functions return values - the linking functions - are combined into a composite linking
                  * function, which is the a linking function for the node.
                  *
+                 * 查找节点中的指令，并且如果找到所有指令的话，那么立即执行指令的compile方法，然后把它们的link方法合并起来返回
+                 *
                  * @param {NodeList} nodeList an array of nodes or NodeList to compile
                  * @param {function(angular.Scope, cloneAttachFn=)} transcludeFn A linking function, where the
                  *        scope argument is auto-generated to the new child of the transcluded parent scope.
@@ -6581,7 +6584,7 @@
                             addDirective(directives,
                                 directiveNormalize(nodeName_(node)), 'E', maxPriority, ignoreDirective);
 
-                            // iterate over the attributes
+                            // 检查节点的属性
                             for (var attr, name, nName, ngAttrName, value, isNgAttr, nAttrs = node.attributes,
                                      j = 0, jj = nAttrs && nAttrs.length; j < jj; j++) {
                                 var attrStartName = false;
@@ -6591,14 +6594,18 @@
                                 name = attr.name;
                                 value = trim(attr.value);
 
-                                // support ngAttr attribute binding
+                                // 把指令前面的data和x前缀去掉，然后把指令名称格式化成ngApp形势
                                 ngAttrName = directiveNormalize(name);
                                 if (isNgAttr = NG_ATTR_BINDING.test(ngAttrName)) {
+                                    //去掉指令前面的ngAttr前缀，这是为了让普通的属性可以支持Angular表达式
                                     name = snake_case(ngAttrName.substr(6), '-');
                                 }
 
+                                //支持多元素指令，这里首先把指令名称的start和end的后缀去掉
                                 var directiveNName = ngAttrName.replace(/(Start|End)$/, '');
                                 if (directiveIsMultiElement(directiveNName)) {
+                                    //如果是一个多元素指令，那么在找到开始指令的时候，同时确定结束指令的名字。
+                                    //例如：现在的attrStartName="make-pretty-start",且attrEndName="make-pretty-end"，而且name="make-pretty"
                                     if (ngAttrName === directiveNName + 'Start') {
                                         attrStartName = name;
                                         attrEndName = name.substr(0, name.length - 5) + 'end';
@@ -7254,12 +7261,14 @@
                  * looks up the directive and returns true if it is a multi-element directive,
                  * and therefore requires DOM nodes between -start and -end markers to be grouped
                  * together.
-                 *
+                 * 查看指令定义确定指令是否是一个多元素指令
                  * @param {string} name name of the directive to look up.
                  * @returns true if directive was registered as multi-element.
                  */
                 function directiveIsMultiElement(name) {
+                    //首先确认下指令是否存在
                     if (hasDirectives.hasOwnProperty(name)) {
+                        //从$injector中查找指令定义,注意在依赖注入系统中指令的名字被加上了后缀Directive。
                         for (var directive, directives = $injector.get(name + Suffix),
                                  i = 0, ii = directives.length; i < ii; i++) {
                             directive = directives[i];
