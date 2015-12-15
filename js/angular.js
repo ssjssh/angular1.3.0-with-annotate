@@ -485,6 +485,14 @@
     }
 
 
+    /**
+     * 继承的实现，注意：这里是继承一个对象，然后添加自己的属性。
+     * parent指定的是继承的原型，然后子对象和extra属性合并。
+     * 因此inherit和Object.create接口一致。
+     * @param parent
+     * @param extra
+     * @returns {Object}
+     */
     function inherit(parent, extra) {
         return extend(new (extend(function () {
         }, {prototype: parent}))(), extra);
@@ -1517,6 +1525,7 @@
              */
             injector.invoke(['$rootScope', '$rootElement', '$compile', '$injector',
                     function bootstrapApply(scope, element, compile, injector) {
+                        //TODO ？scope.$apply不懂
                         scope.$apply(function () {
                             element.data('$injector', injector);
                             compile(element)(scope);
@@ -5902,14 +5911,16 @@
     var $compileMinErr = minErr('$compile');
 
     /**
+     * $inject中存储的这个函数的依赖
      * @ngdoc provider
      * @name $compileProvider
-     *
      * @description
      */
     $CompileProvider.$inject = ['$provide', '$$sanitizeUriProvider'];
     function $CompileProvider($provide, $$sanitizeUriProvider) {
-        //存储了系统中定义的指令的匿名函数,这里并没有记录指令的详细配置，正如其名字所示的一样。
+        /*存储了系统中定义的指令的匿名函数,这里并没有记录指令的详细配置，正如其名字所示的一样。
+         * 真实的指令配置存储在$injector中。也就是说指令也是单例的。
+         * */
         var hasDirectives = {},
             Suffix = 'Directive',
             COMMENT_DIRECTIVE_REGEXP = /^\s*directive\:\s*([\w\-]+)\s+(.*)$/,
@@ -6366,6 +6377,15 @@
 
                 //================================
 
+                /**
+                 * 编译节点的Service对象。
+                 * @param $compileNodes
+                 * @param transcludeFn
+                 * @param maxPriority
+                 * @param ignoreDirective
+                 * @param previousCompileContext
+                 * @returns {Function}
+                 */
                 function compile($compileNodes, transcludeFn, maxPriority, ignoreDirective,
                                  previousCompileContext) {
                     if (!($compileNodes instanceof jqLite)) {
@@ -6566,6 +6586,8 @@
                  * Looks for directives on the given node and adds them to the directive collection which is
                  * sorted.
                  *
+                 * 收集一个节点的所有指令
+                 *
                  * @param node Node to search.
                  * @param directives An array to which the directives are added to. This array is sorted before
                  *        the function returns.
@@ -6580,7 +6602,8 @@
 
                     switch (nodeType) {
                         case NODE_TYPE_ELEMENT: /* Element */
-                            // use the node name: <directive>
+                            // 尝试下nodeName是不是一个指令，也就是把nodeName加入到指令列表中
+                            // 因为指令作为元素节点的时候，没有加任何前缀，所以不不要复杂的预处理过程
                             addDirective(directives,
                                 directiveNormalize(nodeName_(node)), 'E', maxPriority, ignoreDirective);
 
@@ -6600,6 +6623,7 @@
                                     //去掉指令前面的ngAttr前缀，这是为了让普通的属性可以支持Angular表达式
                                     name = snake_case(ngAttrName.substr(6), '-');
                                 }
+                                //现在ngAttrName是包含了ng-attr-前缀的指令
 
                                 //支持多元素指令，这里首先把指令名称的start和end的后缀去掉
                                 var directiveNName = ngAttrName.replace(/(Start|End)$/, '');
@@ -6613,15 +6637,23 @@
                                     }
                                 }
 
+                                /**
+                                 * 前面的代码一直是把属性按照指令来处理的。一直没有判断属性是不是一个指令，但是对于属性的操作不会影响网页的布局
+                                 * 因为没有修改属性值
+                                 */
                                 nName = directiveNormalize(name.toLowerCase());
                                 attrsMap[nName] = name;
                                 if (isNgAttr || !attrs.hasOwnProperty(nName)) {
                                     attrs[nName] = value;
+                                    //如果这个属性是只有一个可能值的属性，那么它一旦出现就把它的值算成true
                                     if (getBooleanAttrName(node, nName)) {
                                         attrs[nName] = true; // presence means true
                                     }
                                 }
+                                //todo ???
                                 addAttrInterpolateDirective(node, directives, value, nName, isNgAttr);
+                                //真正把是指令的属性添加到指令列表里面去
+                                //另外一点，多元素指令只能作为属性出现，不能在其他地方出现。
                                 addDirective(directives, nName, 'A', maxPriority, ignoreDirective, attrStartName,
                                     attrEndName);
                             }
@@ -6629,6 +6661,7 @@
                             // use class as directive
                             className = node.className;
                             if (isString(className) && className !== '') {
+                                //按照空白把class中的内容用空格分开，并且匹配出每一个class
                                 while (match = CLASS_DIRECTIVE_REGEXP.exec(className)) {
                                     nName = directiveNormalize(match[2]);
                                     if (addDirective(directives, nName, 'C', maxPriority, ignoreDirective)) {
@@ -6639,6 +6672,7 @@
                             }
                             break;
                         case NODE_TYPE_TEXT: /* Text Node */
+                            //todo ???
                             addTextInterpolateDirective(directives, node.nodeValue);
                             break;
                         case NODE_TYPE_COMMENT: /* Comment */
@@ -6658,6 +6692,7 @@
                             break;
                     }
 
+                    //按照等级，名字和index来给指令排序
                     directives.sort(byPriority);
                     return directives;
                 }
@@ -7221,6 +7256,9 @@
                  * looks up the directive and decorates it with exception handling and proper parameters. We
                  * call this the boundDirective.
                  *
+                 * 给定一个可能是指令名字和指令配置，检查是否是一个有效的指令；如果是，那么把指令装在tDirectives数组中
+                 * 并且返回这个指令
+                 *
                  * @param {string} name name of the directive to look up.
                  * @param {string} location The directive must be found in specific format.
                  *   String containing any of theses characters:
@@ -7233,6 +7271,7 @@
                  */
                 function addDirective(tDirectives, name, location, maxPriority, ignoreDirective, startAttrName,
                                       endAttrName) {
+                    //ignoreDirective的这种比较方法，意味着一次调用compile只能指定一个要忽略的指令
                     if (name === ignoreDirective) return null;
                     var match = null;
                     if (hasDirectives.hasOwnProperty(name)) {
@@ -7240,8 +7279,14 @@
                                  i = 0, ii = directives.length; i < ii; i++) {
                             try {
                                 directive = directives[i];
+                                /**
+                                 * 要匹配指令，必须满足两个条件
+                                 * 1，指令的priority必须小于maxPriority
+                                 * 2，指令能使用的地方（restrict）必须可以出现在指定的位置
+                                 */
                                 if ((maxPriority === undefined || maxPriority > directive.priority) &&
                                     directive.restrict.indexOf(location) != -1) {
+                                    //如果是多元素指令，那么加入数组的指令定义继承自原来的指令，但是加入了两个熟悉：开始指令标签名和结束指令标签名
                                     if (startAttrName) {
                                         directive = inherit(directive, {$$start: startAttrName, $$end: endAttrName});
                                     }
@@ -7438,6 +7483,7 @@
 
 
                 /**
+                 * 按照等级，名字和index来给指令排序
                  * Sorting function for bound directives.
                  */
                 function byPriority(a, b) {
@@ -7512,6 +7558,14 @@
                 }
 
 
+                /**
+                 *
+                 * @param node
+                 * @param directives
+                 * @param value
+                 * @param name
+                 * @param allOrNothing
+                 */
                 function addAttrInterpolateDirective(node, directives, value, name, allOrNothing) {
                     var interpolateFn = $interpolate(value, true);
 
@@ -10129,7 +10183,7 @@
          */
         this.$$compose = function () {
             var search = toKeyValue(this.$$search),
-                hash = this.$$hash ? '#' + encodeUriSegment(this.$$hash) : '';
+                    hash = this.$$hash ? '#' + encodeUriSegment(this.$$hash) : '';
 
             this.$$url = encodePath(this.$$path) + (search ? '?' + search : '') + hash;
             this.$$absUrl = appBase + (this.$$url ? hashPrefix + this.$$url : '');
